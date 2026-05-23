@@ -85,20 +85,20 @@
                 <div class="form-actions">
                     @if (_selected != null)
                     {
-                        <button class="btn btn-blue"  @onclick="UpdateRule">✏️ Update</button>
-                        <button class="btn btn-grey"  @onclick="ClearForm">✕ Deselect</button>
+                        <button class="btn btn-blue"  @onclick="UpdateRule"> Update</button>
+                        <button class="btn btn-grey"  @onclick="ClearForm"> Deselect</button>
                     }
                     else
                     {
-                        <button class="btn btn-green" @onclick="AddRule">➕ Add Rule</button>
+                        <button class="btn btn-green" @onclick="AddRule"> Add Rule</button>
                     }
                 </div>
             </div>
 
             <!-- Footer -->
             <div class="modal-footer">
-                <button class="btn btn-green" @onclick="Save">✅ Save</button>
-                <button class="btn btn-grey"  @onclick="Cancel">❌ Cancel</button>
+                <button class="btn btn-green" @onclick="Save"> Save</button>
+                <button class="btn btn-grey"  @onclick="Cancel"> Cancel</button>
             </div>
 
         </div>
