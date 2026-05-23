@@ -315,7 +315,11 @@
 
     // ─── Filter ──────────────────────────────────────────────────────────
 
-    private void OnFilterChanged()  => ApplyFilter();
+    private void OnFilterChanged(ChangeEventArgs e)
+{
+    _textFilter = e.Value?.ToString() ?? string.Empty;
+    ApplyFilter();
+}
     private void SetLevelFilter(string level) { _levelFilter = level; ApplyFilter(); }
 
     private void ApplyFilter()
