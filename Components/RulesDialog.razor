@@ -1,0 +1,186 @@
+@using LogTailBlazor.Models
+
+@if (IsVisible)
+{
+    <div class="modal-overlay" @onclick="Cancel">
+        <div class="modal-box" @onclick:stopPropagation="true">
+
+            <div class="modal-header">
+                <span>🎨 Highlighting Rules</span>
+                <button class="btn-icon" @onclick="Cancel">✕</button>
+            </div>
+
+            <!-- Rules table -->
+            <div class="rules-table-wrap">
+                <table class="rules-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Keyword</th>
+                            <th>Text Color</th>
+                            <th>Background</th>
+                            <th>Ignore Case</th>
+                            <th>Bold</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var rule in _rules)
+                        {
+                            <tr class="@(_selected == rule ? "selected-row" : "")"
+                                @onclick="() => SelectRule(rule)">
+                                <td>@rule.Order</td>
+                                <td>@rule.Keyword</td>
+                                <td>
+                                    <span class="color-chip"
+                                          style="background:@rule.BackgroundColor; color:@rule.TextColor">
+                                        @rule.TextColor
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="color-chip"
+                                          style="background:@rule.BackgroundColor; color:@rule.TextColor">
+                                        @rule.BackgroundColor
+                                    </span>
+                                </td>
+                                <td><input type="checkbox" checked="@rule.IgnoreCase" disabled/></td>
+                                <td><input type="checkbox" checked="@rule.IsBold" disabled/></td>
+                                <td>
+                                    <button class="btn-sm btn-up"   @onclick="() => MoveUp(rule)"   @onclick:stopPropagation="true">▲</button>
+                                    <button class="btn-sm btn-down" @onclick="() => MoveDown(rule)" @onclick:stopPropagation="true">▼</button>
+                                    <button class="btn-sm btn-del"  @onclick="() => Delete(rule)"   @onclick:stopPropagation="true">🗑</button>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Form -->
+            <div class="rule-form">
+                <div class="form-row">
+                    <label>Keyword</label>
+                    <input class="form-input" @bind="_form.Keyword" placeholder="ERROR"/>
+
+                    <label>Text Color</label>
+                    <div class="color-input-wrap">
+                        <input type="color" @bind="_form.TextColor"/>
+                        <input class="form-input sm" @bind="_form.TextColor"/>
+                    </div>
+
+                    <label>Background</label>
+                    <div class="color-input-wrap">
+                        <input type="color" @bind="_form.BackgroundColor"/>
+                        <input class="form-input sm" @bind="_form.BackgroundColor"/>
+                    </div>
+
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="_form.IgnoreCase"/> Ignore Case
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" @bind="_form.IsBold"/> Bold
+                    </label>
+                </div>
+
+                <div class="form-actions">
+                    @if (_selected != null)
+                    {
+                        <button class="btn btn-blue"  @onclick="UpdateRule">✏️ Update</button>
+                        <button class="btn btn-grey"  @onclick="ClearForm">✕ Deselect</button>
+                    }
+                    else
+                    {
+                        <button class="btn btn-green" @onclick="AddRule">➕ Add Rule</button>
+                    }
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="modal-footer">
+                <button class="btn btn-green" @onclick="Save">✅ Save</button>
+                <button class="btn btn-grey"  @onclick="Cancel">❌ Cancel</button>
+            </div>
+
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public List<HighlightRule> InitialRules { get; set; } = new();
+    [Parameter] public EventCallback<List<HighlightRule>> OnSave { get; set; }
+    [Parameter] public EventCallback OnCancel { get; set; }
+
+    private List<HighlightRule> _rules = new();
+    private HighlightRule?      _selected;
+    private HighlightRule       _form = new() { TextColor = "#FFFFFF", BackgroundColor = "#000000", IgnoreCase = true };
+
+    protected override void OnParametersSet()
+    {
+        if (IsVisible)
+        {
+            _rules = InitialRules.Select(r => r.Clone()).OrderBy(r => r.Order).ToList();
+            _selected = null;
+            ClearForm();
+        }
+    }
+
+    private void SelectRule(HighlightRule rule)
+    {
+        _selected = rule;
+        _form = rule.Clone();
+    }
+
+    private void AddRule()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Keyword)) return;
+        _form.Order = _rules.Count;
+        _rules.Add(_form.Clone());
+        ClearForm();
+    }
+
+    private void UpdateRule()
+    {
+        if (_selected == null) return;
+        var idx = _rules.IndexOf(_selected);
+        if (idx < 0) return;
+        _rules[idx] = _form.Clone();
+        _rules[idx].Order = idx;
+        _selected = null;
+        ClearForm();
+    }
+
+    private void Delete(HighlightRule rule)
+    {
+        _rules.Remove(rule);
+        Reorder();
+        if (_selected == rule) { _selected = null; ClearForm(); }
+    }
+
+    private void MoveUp(HighlightRule rule)
+    {
+        var i = _rules.IndexOf(rule);
+        if (i <= 0) return;
+        (_rules[i], _rules[i - 1]) = (_rules[i - 1], _rules[i]);
+        Reorder();
+    }
+
+    private void MoveDown(HighlightRule rule)
+    {
+        var i = _rules.IndexOf(rule);
+        if (i < 0 || i >= _rules.Count - 1) return;
+        (_rules[i], _rules[i + 1]) = (_rules[i + 1], _rules[i]);
+        Reorder();
+    }
+
+    private void Reorder()
+    {
+        for (int i = 0; i < _rules.Count; i++) _rules[i].Order = i;
+    }
+
+    private void ClearForm()
+        => _form = new() { TextColor = "#FFFFFF", BackgroundColor = "#000000", IgnoreCase = true };
+
+    private async Task Save()   => await OnSave.InvokeAsync(_rules);
+    private async Task Cancel() => await OnCancel.InvokeAsync();
+}
