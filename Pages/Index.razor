@@ -8,7 +8,6 @@
 
 <PageTitle>LogTail</PageTitle>
 
-<!-- Rules Dialog -->
 <RulesDialog IsVisible="@_showRules"
              InitialRules="@_settings.HighlightRules"
              OnSave="OnRulesSaved"
@@ -16,16 +15,16 @@
 
 <div class="app-shell">
 
-    <!-- ═══ Menu Bar ═══ -->
+    <!-- Menu Bar -->
     <nav class="menu-bar">
         <div class="menu-item" @onclick="ToggleFileMenu">
             File
             @if (_fileMenuOpen)
             {
                 <div class="dropdown" @onclick:stopPropagation="true">
-                    <div class="dropdown-item" @onclick="OpenFilePicker">📂 Open file…</div>
+                    <div class="dropdown-item" @onclick="OpenFilePicker">Open file...</div>
                     <div class="dropdown-sep"></div>
-                    <div class="dropdown-item" @onclick="ClearView">🗑️ Clear view</div>
+                    <div class="dropdown-item" @onclick="ClearView">Clear view</div>
                 </div>
             }
         </div>
@@ -34,9 +33,9 @@
             @if (_viewMenuOpen)
             {
                 <div class="dropdown" @onclick:stopPropagation="true">
-                    <div class="dropdown-item" @onclick="ShowRules">🎨 Highlighting Rules…</div>
+                    <div class="dropdown-item" @onclick="ShowRules">Highlighting Rules...</div>
                     <div class="dropdown-sep"></div>
-                    <div class="dropdown-item" @onclick="ScrollToEnd">⬇ Scroll to End</div>
+                    <div class="dropdown-item" @onclick="ScrollToEnd">Scroll to End</div>
                 </div>
             }
         </div>
@@ -63,18 +62,18 @@
         </div>
     </nav>
 
-    <!-- ═══ Toolbar ═══ -->
+    <!-- Toolbar -->
     <div class="toolbar">
         <div class="toolbar-left">
-            <button class="btn-toolbar" @onclick="OpenFilePicker">📂 Open</button>
-            <button class="btn-toolbar" @onclick="ShowRules">🎨 Rules</button>
-            <button class="btn-toolbar" @onclick="ClearView">🗑️ Clear</button>
+            <button class="btn-toolbar" @onclick="OpenFilePicker">Open</button>
+            <button class="btn-toolbar" @onclick="ShowRules">Rules</button>
+            <button class="btn-toolbar" @onclick="ClearView">Clear</button>
         </div>
 
         <div class="filter-box">
-            <span class="filter-icon">🔍</span>
+            <span class="filter-icon">Search</span>
             <input class="filter-input"
-                   placeholder="Filter logs…"
+                   placeholder="Filter logs..."
                    value="@_textFilter"
                    @oninput="@((e) => OnFilterChanged(e))"/>
             <label class="case-toggle" title="Case sensitive">
@@ -87,46 +86,36 @@
         <span class="line-count">@_lineCountText</span>
     </div>
 
-    <!-- ═══ Quick Filter Buttons ═══ -->
+    <!-- Quick Filter Buttons (mode exclusion) -->
     <div class="quick-filters">
-        <span class="qf-label">Quick filters:</span>
+        <span class="qf-label">Show:</span>
 
-        <button class="qf-btn @(_levelFilter == "" ? "active" : "")"
-                style="--qf-color:#555555"
-                @onclick='() => SetLevelFilter("")'>ALL</button>
-
-        @foreach (var qf in _quickFilters)
+        @foreach (var qf in _allFilterButtons)
         {
-            <button class="qf-btn @(_levelFilter == qf.Keyword ? "active" : "")"
+            var excluded = _excludedLevels.Contains(qf.Keyword);
+            <button class="qf-btn @(!excluded ? "active" : "inactive")"
                     style="--qf-color:@qf.BgColor"
-                    @onclick="() => SetLevelFilter(qf.Keyword)">
-                @qf.Icon @qf.Keyword
+                    title="@(!excluded ? $"Click to hide {qf.Keyword}" : $"Click to show {qf.Keyword}")"
+                    @onclick="() => ToggleExclusion(qf.Keyword)">
+                @qf.Keyword
             </button>
         }
 
-        @if (_dynamicButtons.Any())
+        @if (_excludedLevels.Any())
         {
-            <div class="qf-sep"></div>
-            @foreach (var btn in _dynamicButtons)
-            {
-                <button class="qf-btn @(_levelFilter == btn.Keyword ? "active" : "")"
-                        style="--qf-color:@btn.BgColor"
-                        @onclick="() => SetLevelFilter(btn.Keyword)">
-                    @btn.Keyword
-                </button>
-            }
+            <button class="qf-reset" @onclick="ResetFilters">Reset</button>
         }
     </div>
 
-    <!-- ═══ Log Grid ═══ -->
+    <!-- Log Grid -->
     <div class="log-area" id="log-area" @onclick="CloseAllMenus">
         @if (!_lines.Any())
         {
             <div class="empty-state">
-                <div class="empty-icon">📋</div>
+                <div class="empty-icon">[ ]</div>
                 <div class="empty-title">No log file loaded</div>
-                <div class="empty-sub">Click <strong>📂 Open</strong> to select a <code>.log</code> or <code>.txt</code> file</div>
-                <button class="btn-toolbar mt-16" @onclick="OpenFilePicker">📂 Open file…</button>
+                <div class="empty-sub">Click <strong>Open</strong> to select a <code>.log</code> or <code>.txt</code> file</div>
+                <button class="btn-toolbar mt-16" @onclick="OpenFilePicker">Open file...</button>
             </div>
         }
         else
@@ -178,7 +167,7 @@
         }
     </div>
 
-    <!-- ═══ Status Bar ═══ -->
+    <!-- Status Bar -->
     <div class="status-bar">
         <span>@_statusText</span>
         <span class="status-file">@_fileName</span>
@@ -186,28 +175,32 @@
 
 </div>
 
-<!-- Hidden file input -->
 <InputFile id="fileInput" OnChange="OnFileSelected" style="display:none"
            accept=".log,.txt,.csv" />
 
 @code {
 
-    private AppSettings        _settings         = new();
-    private List<LogLine>      _lines            = new();
-    private List<LogLine>      _visibleLines     = new();
-    private string             _textFilter       = string.Empty;
-    private string             _levelFilter      = string.Empty;
-    private bool               _caseSensitive    = false;
-    private bool               _hasParsedColumns = false;
-    private string             _statusText       = "Ready — Open a log file to begin";
-    private string             _fileName         = string.Empty;
-    private string             _lineCountText    = string.Empty;
-    private bool               _showRules        = false;
+    // State
+    private AppSettings   _settings         = new();
+    private List<LogLine> _lines            = new();
+    private List<LogLine> _visibleLines     = new();
+    private string        _textFilter       = string.Empty;
+    private bool          _caseSensitive    = false;
+    private bool          _hasParsedColumns = false;
+    private string        _statusText       = "Ready — Open a log file to begin";
+    private string        _fileName         = string.Empty;
+    private string        _lineCountText    = string.Empty;
+    private bool          _showRules        = false;
 
+    // Exclusion filter — niveaux à MASQUER (bouton éteint = exclu)
+    private HashSet<string> _excludedLevels = new(StringComparer.OrdinalIgnoreCase);
+
+    // Menu state
     private bool _fileMenuOpen     = false;
     private bool _viewMenuOpen     = false;
     private bool _settingsMenuOpen = false;
 
+    // Separator options
     private record SepOption(string Label, string Value);
     private readonly List<SepOption> _separators = new()
     {
@@ -218,23 +211,25 @@
         new("None",        ""),
     };
 
-    private record QfButton(string Keyword, string Icon, string BgColor);
-    private readonly List<QfButton> _quickFilters = new()
+    // Tous les boutons de filtre (built-in + dynamiques)
+    private record QfButton(string Keyword, string BgColor);
+    private readonly List<QfButton> _builtInFilters = new()
     {
-        new("ERROR", "●", "#DC3545"),
-        new("WARN",  "▲", "#D39E00"),
-        new("INFO",  "ℹ", "#138496"),
-        new("DEBUG", "⚙", "#545B62"),
+        new("ERROR", "#DC3545"),
+        new("WARN",  "#D39E00"),
+        new("INFO",  "#138496"),
+        new("DEBUG", "#545B62"),
     };
+    private List<QfButton> _allFilterButtons = new();
 
-    private List<QfButton> _dynamicButtons = new();
-
+    // Lifecycle
     protected override async Task OnInitializedAsync()
     {
         _settings = await SettingsService.LoadAsync();
-        BuildDynamicButtons();
+        RebuildFilterButtons();
     }
 
+    // File handling
     private async Task OpenFilePicker()
     {
         CloseAllMenus();
@@ -245,7 +240,7 @@
     {
         var file = e.File;
         _fileName   = file.Name;
-        _statusText = $"Loading: {file.Name}…";
+        _statusText = $"Loading: {file.Name}...";
         StateHasChanged();
 
         try
@@ -262,6 +257,7 @@
                 && _lines.Any(l => !string.IsNullOrEmpty(l.Timestamp));
 
             _statusText = $"Loaded: {file.Name}";
+            _excludedLevels.Clear(); // reset filtres au chargement
             ApplyFilter();
             UpdateLineCount();
 
@@ -274,30 +270,49 @@
         }
     }
 
+    // Rules
     private void ShowRules() { CloseAllMenus(); _showRules = true; }
 
     private async Task OnRulesSaved(List<HighlightRule> newRules)
     {
         _settings.HighlightRules = newRules;
         await SettingsService.SaveAsync(_settings);
-        BuildDynamicButtons();
+        RebuildFilterButtons();
         foreach (var line in _lines)
             ParserService.ApplyHighlighting(line, line.RawText, _settings);
         ApplyFilter();
         _showRules = false;
     }
 
-    private void BuildDynamicButtons()
+    private void RebuildFilterButtons()
     {
-        var builtIn = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        var builtInKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "ERROR", "WARN", "INFO", "DEBUG" };
 
-        _dynamicButtons = _settings.HighlightRules
-            .Where(r => !builtIn.Contains(r.Keyword))
-            .Select(r => new QfButton(r.Keyword, "", r.BackgroundColor))
-            .ToList();
+        var extra = _settings.HighlightRules
+            .Where(r => !builtInKeywords.Contains(r.Keyword))
+            .Select(r => new QfButton(r.Keyword, r.BackgroundColor));
+
+        _allFilterButtons = _builtInFilters.Concat(extra).ToList();
     }
 
+    // Exclusion toggle — cliquer sur un bouton allumé l'éteint (exclut ce niveau)
+    private void ToggleExclusion(string keyword)
+    {
+        if (_excludedLevels.Contains(keyword))
+            _excludedLevels.Remove(keyword);
+        else
+            _excludedLevels.Add(keyword);
+        ApplyFilter();
+    }
+
+    private void ResetFilters()
+    {
+        _excludedLevels.Clear();
+        ApplyFilter();
+    }
+
+    // Filter
     private void OnFilterChanged(ChangeEventArgs e)
     {
         _textFilter = e.Value?.ToString() ?? string.Empty;
@@ -305,8 +320,6 @@
     }
 
     private void OnCaseSensitiveChanged() => ApplyFilter();
-
-    private void SetLevelFilter(string level) { _levelFilter = level; ApplyFilter(); }
 
     private void ApplyFilter()
     {
@@ -317,13 +330,18 @@
 
     private bool MatchesFilter(LogLine line)
     {
-        if (!string.IsNullOrEmpty(_levelFilter))
+        // Exclusion par niveau : si le niveau de la ligne est dans _excludedLevels → on cache
+        if (_excludedLevels.Any())
         {
-            var cmp = StringComparison.OrdinalIgnoreCase;
-            if (!line.Level.Contains(_levelFilter, cmp) &&
-                !line.RawText.Contains(_levelFilter, cmp))
-                return false;
+            var level = string.IsNullOrEmpty(line.Level) ? line.RawText : line.Level;
+            foreach (var excluded in _excludedLevels)
+            {
+                if (level.Contains(excluded, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
         }
+
+        // Filtre texte
         if (!string.IsNullOrWhiteSpace(_textFilter))
         {
             var cmp = _caseSensitive
@@ -331,6 +349,7 @@
                 : StringComparison.OrdinalIgnoreCase;
             if (!line.RawText.Contains(_textFilter, cmp)) return false;
         }
+
         return true;
     }
 
@@ -343,6 +362,7 @@
             : $"{filtered:N0} / {total:N0} lines";
     }
 
+    // Settings
     private async Task SetSeparator(string sep)
     {
         _settings.ColumnSeparator = sep;
@@ -367,10 +387,12 @@
         await SettingsService.SaveAsync(_settings);
     }
 
+    // UI helpers
     private void ClearView()
     {
         _lines.Clear();
         _visibleLines.Clear();
+        _excludedLevels.Clear();
         _fileName      = string.Empty;
         _statusText    = "Ready — Open a log file to begin";
         _lineCountText = string.Empty;
@@ -382,30 +404,14 @@
         => await JS.InvokeVoidAsync("logTail.scrollToEnd", "log-area");
 
     private void ToggleFileMenu()
-    {
-        _fileMenuOpen     = !_fileMenuOpen;
-        _viewMenuOpen     = false;
-        _settingsMenuOpen = false;
-    }
+    { _fileMenuOpen = !_fileMenuOpen; _viewMenuOpen = false; _settingsMenuOpen = false; }
 
     private void ToggleViewMenu()
-    {
-        _viewMenuOpen     = !_viewMenuOpen;
-        _fileMenuOpen     = false;
-        _settingsMenuOpen = false;
-    }
+    { _viewMenuOpen = !_viewMenuOpen; _fileMenuOpen = false; _settingsMenuOpen = false; }
 
     private void ToggleSettingsMenu()
-    {
-        _settingsMenuOpen = !_settingsMenuOpen;
-        _fileMenuOpen     = false;
-        _viewMenuOpen     = false;
-    }
+    { _settingsMenuOpen = !_settingsMenuOpen; _fileMenuOpen = false; _viewMenuOpen = false; }
 
     private void CloseAllMenus()
-    {
-        _fileMenuOpen     = false;
-        _viewMenuOpen     = false;
-        _settingsMenuOpen = false;
-    }
+    { _fileMenuOpen = false; _viewMenuOpen = false; _settingsMenuOpen = false; }
 }
