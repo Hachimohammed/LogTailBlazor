@@ -7,7 +7,7 @@
 
 ##  Demo live
 
----> **[[https://TON_USERNAME.github.io/LogTailBlazor](https://TON_USERNAME.github.io/LogTailBlazor)](https://hachimohammed.github.io/LogTailBlazor/)**
+---> **(https://hachimohammed.github.io/LogTailBlazor/)**
 
 ##  Fonctionnalités
 
