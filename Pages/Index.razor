@@ -48,7 +48,7 @@
                     <div class="dropdown-label">Column Separator</div>
                     @foreach (var sep in _separators)
                     {
-                        <div class="dropdown-item @(_settings.ColumnSeparator == sep.Value && _settings.UseSeparator == !string.IsNullOrEmpty(sep.Value) ? "active" : "")"
+                        <div class="dropdown-item @(IsActiveSep(sep.Value) ? "active" : "")"
                              @onclick="() => SetSeparator(sep.Value)">
                             @(IsActiveSep(sep.Value) ? "✓ " : "  ")@sep.Label
                         </div>
@@ -74,11 +74,13 @@
         <div class="filter-box">
             <span class="filter-icon">🔍</span>
             <input class="filter-input"
-       placeholder="Filter logs…"
-       value="@_textFilter"
-       @oninput="@((e) => OnFilterChanged(e))"/>
+                   placeholder="Filter logs…"
+                   value="@_textFilter"
+                   @oninput="@((e) => OnFilterChanged(e))"/>
             <label class="case-toggle" title="Case sensitive">
-                <input type="checkbox" @bind="_caseSensitive" @bind:after="OnFilterChanged"/> Aa
+                <input type="checkbox"
+                       @bind="_caseSensitive"
+                       @bind:after="OnCaseSensitiveChanged"/> Aa
             </label>
         </div>
 
@@ -145,16 +147,13 @@
                         }
                         else
                         {
-                            <th>#</th>
+                            <th style="width:55px">#</th>
                             <th>Log Line</th>
                         }
                     </tr>
                 </thead>
                 <tbody>
-                    <Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize
-                        Items="@_visibleLines"
-                        ItemSize="24"
-                        Context="line">
+                    <Virtualize Items="@_visibleLines" ItemSize="24" Context="line">
                         <tr style="background:@line.BgColor; color:@line.FgColor; font-weight:@line.FontWeight">
                             @if (_hasParsedColumns)
                             {
@@ -173,7 +172,7 @@
                                 <td class="td-message">@line.RawText</td>
                             }
                         </tr>
-                    </Microsoft.AspNetCore.Components.Web.Virtualization.Virtualize>
+                    </Virtualize>
                 </tbody>
             </table>
         }
@@ -193,26 +192,22 @@
 
 @code {
 
-    // ─── State ───────────────────────────────────────────────────────────
-
-    private AppSettings        _settings      = new();
-    private List<LogLine>      _lines         = new();
-    private List<LogLine>      _visibleLines  = new();
-    private string             _textFilter    = string.Empty;
-    private string             _levelFilter   = string.Empty;
-    private bool               _caseSensitive = false;
+    private AppSettings        _settings         = new();
+    private List<LogLine>      _lines            = new();
+    private List<LogLine>      _visibleLines     = new();
+    private string             _textFilter       = string.Empty;
+    private string             _levelFilter      = string.Empty;
+    private bool               _caseSensitive    = false;
     private bool               _hasParsedColumns = false;
-    private string             _statusText    = "Ready — Open a log file to begin";
-    private string             _fileName      = string.Empty;
-    private string             _lineCountText = string.Empty;
-    private bool               _showRules     = false;
+    private string             _statusText       = "Ready — Open a log file to begin";
+    private string             _fileName         = string.Empty;
+    private string             _lineCountText    = string.Empty;
+    private bool               _showRules        = false;
 
-    // Menu state
     private bool _fileMenuOpen     = false;
     private bool _viewMenuOpen     = false;
     private bool _settingsMenuOpen = false;
 
-    // Separator options
     private record SepOption(string Label, string Value);
     private readonly List<SepOption> _separators = new()
     {
@@ -223,7 +218,6 @@
         new("None",        ""),
     };
 
-    // Quick filter buttons (built-in)
     private record QfButton(string Keyword, string Icon, string BgColor);
     private readonly List<QfButton> _quickFilters = new()
     {
@@ -233,10 +227,7 @@
         new("DEBUG", "⚙", "#545B62"),
     };
 
-    // Dynamic buttons from user rules (not in built-in list)
     private List<QfButton> _dynamicButtons = new();
-
-    // ─── Lifecycle ───────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
@@ -244,12 +235,10 @@
         BuildDynamicButtons();
     }
 
-    // ─── File handling ───────────────────────────────────────────────────
-
     private async Task OpenFilePicker()
     {
         CloseAllMenus();
-        await JS.InvokeVoidAsync("document.getElementById('fileInput').click");
+        await JS.InvokeVoidAsync("eval", "document.getElementById('fileInput').click()");
     }
 
     private async Task OnFileSelected(InputFileChangeEventArgs e)
@@ -261,19 +250,18 @@
 
         try
         {
-            using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024); // 100 MB
+            using var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
             using var reader = new System.IO.StreamReader(stream);
-            var content = await reader.ReadToEndAsync();
-
+            var content  = await reader.ReadToEndAsync();
             var rawLines = content.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
             _lines = ParserService.ParseLines(rawLines, _settings);
 
-            // Détecte si les colonnes sont parsées (fichier avec séparateur)
             _hasParsedColumns = _settings.UseSeparator
                 && !string.IsNullOrEmpty(_settings.ColumnSeparator)
                 && _lines.Any(l => !string.IsNullOrEmpty(l.Timestamp));
 
-            _statusText = $"Watching: {file.Name}";
+            _statusText = $"Loaded: {file.Name}";
             ApplyFilter();
             UpdateLineCount();
 
@@ -286,8 +274,6 @@
         }
     }
 
-    // ─── Rules ───────────────────────────────────────────────────────────
-
     private void ShowRules() { CloseAllMenus(); _showRules = true; }
 
     private async Task OnRulesSaved(List<HighlightRule> newRules)
@@ -295,7 +281,6 @@
         _settings.HighlightRules = newRules;
         await SettingsService.SaveAsync(_settings);
         BuildDynamicButtons();
-        // Recolorise les lignes existantes
         foreach (var line in _lines)
             ParserService.ApplyHighlighting(line, line.RawText, _settings);
         ApplyFilter();
@@ -313,13 +298,14 @@
             .ToList();
     }
 
-    // ─── Filter ──────────────────────────────────────────────────────────
-
     private void OnFilterChanged(ChangeEventArgs e)
-{
-    _textFilter = e.Value?.ToString() ?? string.Empty;
-    ApplyFilter();
-}
+    {
+        _textFilter = e.Value?.ToString() ?? string.Empty;
+        ApplyFilter();
+    }
+
+    private void OnCaseSensitiveChanged() => ApplyFilter();
+
     private void SetLevelFilter(string level) { _levelFilter = level; ApplyFilter(); }
 
     private void ApplyFilter()
@@ -340,7 +326,9 @@
         }
         if (!string.IsNullOrWhiteSpace(_textFilter))
         {
-            var cmp = _caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
+            var cmp = _caseSensitive
+                ? StringComparison.Ordinal
+                : StringComparison.OrdinalIgnoreCase;
             if (!line.RawText.Contains(_textFilter, cmp)) return false;
         }
         return true;
@@ -355,14 +343,11 @@
             : $"{filtered:N0} / {total:N0} lines";
     }
 
-    // ─── Settings ────────────────────────────────────────────────────────
-
     private async Task SetSeparator(string sep)
     {
         _settings.ColumnSeparator = sep;
         _settings.UseSeparator    = !string.IsNullOrEmpty(sep);
         await SettingsService.SaveAsync(_settings);
-        // Reparse
         var rawTexts = _lines.Select(l => l.RawText).ToList();
         _lines = ParserService.ParseLines(rawTexts, _settings);
         _hasParsedColumns = _settings.UseSeparator
@@ -372,7 +357,9 @@
     }
 
     private bool IsActiveSep(string val)
-        => val == "" ? !_settings.UseSeparator : (_settings.UseSeparator && _settings.ColumnSeparator == val);
+        => val == ""
+            ? !_settings.UseSeparator
+            : (_settings.UseSeparator && _settings.ColumnSeparator == val);
 
     private async Task ToggleAutoScroll()
     {
@@ -380,24 +367,45 @@
         await SettingsService.SaveAsync(_settings);
     }
 
-    // ─── UI helpers ──────────────────────────────────────────────────────
-
     private void ClearView()
     {
-        _lines.Clear(); _visibleLines.Clear();
-        _fileName = string.Empty;
-        _statusText = "Ready — Open a log file to begin";
+        _lines.Clear();
+        _visibleLines.Clear();
+        _fileName      = string.Empty;
+        _statusText    = "Ready — Open a log file to begin";
         _lineCountText = string.Empty;
         CloseAllMenus();
+        StateHasChanged();
     }
 
     private async Task ScrollToEnd()
         => await JS.InvokeVoidAsync("logTail.scrollToEnd", "log-area");
 
-    private void ToggleFileMenu()     { _fileMenuOpen = !_fileMenuOpen; _viewMenuOpen = false; _settingsMenuOpen = false; }
-    private void ToggleViewMenu()     { _viewMenuOpen = !_viewMenuOpen; _fileMenuOpen = false; _settingsMenuOpen = false; }
-    private void ToggleSettingsMenu() { _settingsMenuOpen = !_settingsMenuOpen; _fileMenuOpen = false; _viewMenuOpen = false; }
+    private void ToggleFileMenu()
+    {
+        _fileMenuOpen     = !_fileMenuOpen;
+        _viewMenuOpen     = false;
+        _settingsMenuOpen = false;
+    }
+
+    private void ToggleViewMenu()
+    {
+        _viewMenuOpen     = !_viewMenuOpen;
+        _fileMenuOpen     = false;
+        _settingsMenuOpen = false;
+    }
+
+    private void ToggleSettingsMenu()
+    {
+        _settingsMenuOpen = !_settingsMenuOpen;
+        _fileMenuOpen     = false;
+        _viewMenuOpen     = false;
+    }
 
     private void CloseAllMenus()
-    { _fileMenuOpen = false; _viewMenuOpen = false; _settingsMenuOpen = false; }
+    {
+        _fileMenuOpen     = false;
+        _viewMenuOpen     = false;
+        _settingsMenuOpen = false;
+    }
 }
