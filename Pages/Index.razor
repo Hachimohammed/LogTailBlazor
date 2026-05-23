@@ -76,7 +76,7 @@
             <input class="filter-input"
        placeholder="Filter logs…"
        value="@_textFilter"
-       @oninput="OnFilterChanged"/>
+       @oninput="@((e) => OnFilterChanged(e))"/>
             <label class="case-toggle" title="Case sensitive">
                 <input type="checkbox" @bind="_caseSensitive" @bind:after="OnFilterChanged"/> Aa
             </label>
