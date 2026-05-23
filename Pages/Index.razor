@@ -68,6 +68,12 @@
             <button class="btn-toolbar" @onclick="OpenFilePicker">Open</button>
             <button class="btn-toolbar" @onclick="ShowRules">Rules</button>
             <button class="btn-toolbar" @onclick="ClearView">Clear</button>
+            @if (_sortColumn != null)
+            {
+                <button class="btn-toolbar btn-toolbar-reset" @onclick="ResetSort">
+                    Reset sort
+                </button>
+            }
         </div>
 
         <div class="filter-box">
@@ -86,10 +92,9 @@
         <span class="line-count">@_lineCountText</span>
     </div>
 
-    <!-- Quick Filter Buttons (mode exclusion) -->
+    <!-- Quick Filter Buttons -->
     <div class="quick-filters">
         <span class="qf-label">Show:</span>
-
         @foreach (var qf in _allFilterButtons)
         {
             var excluded = _excludedLevels.Contains(qf.Keyword);
@@ -100,7 +105,6 @@
                 @qf.Keyword
             </button>
         }
-
         @if (_excludedLevels.Any())
         {
             <button class="qf-reset" @onclick="ResetFilters">Reset</button>
@@ -125,19 +129,37 @@
                     <tr>
                         @if (_hasParsedColumns)
                         {
-                            <th style="width:175px">Timestamp</th>
-                            <th style="width:110px">Machine</th>
-                            <th style="width:130px">Application</th>
-                            <th style="width:65px">Level</th>
-                            <th style="width:90px">Category</th>
-                            <th style="width:110px">Event Type</th>
-                            <th style="width:130px">Event Code</th>
-                            <th>Message</th>
+                            <th style="width:175px" @onclick='() => SetSort("Timestamp")'   class="sortable @SortClass("Timestamp")">
+                                Timestamp @SortIcon("Timestamp")
+                            </th>
+                            <th style="width:110px" @onclick='() => SetSort("Machine")'     class="sortable @SortClass("Machine")">
+                                Machine @SortIcon("Machine")
+                            </th>
+                            <th style="width:130px" @onclick='() => SetSort("Application")' class="sortable @SortClass("Application")">
+                                Application @SortIcon("Application")
+                            </th>
+                            <th style="width:65px"  @onclick='() => SetSort("Level")'       class="sortable @SortClass("Level")">
+                                Level @SortIcon("Level")
+                            </th>
+                            <th style="width:90px"  @onclick='() => SetSort("Category")'    class="sortable @SortClass("Category")">
+                                Category @SortIcon("Category")
+                            </th>
+                            <th style="width:110px" @onclick='() => SetSort("EventType")'   class="sortable @SortClass("EventType")">
+                                Event Type @SortIcon("EventType")
+                            </th>
+                            <th style="width:130px" @onclick='() => SetSort("EventCode")'   class="sortable @SortClass("EventCode")">
+                                Event Code @SortIcon("EventCode")
+                            </th>
+                            <th @onclick='() => SetSort("Message")' class="sortable @SortClass("Message")">
+                                Message @SortIcon("Message")
+                            </th>
                         }
                         else
                         {
                             <th style="width:55px">#</th>
-                            <th>Log Line</th>
+                            <th @onclick='() => SetSort("RawText")' class="sortable @SortClass("RawText")">
+                                Log Line @SortIcon("RawText")
+                            </th>
                         }
                     </tr>
                 </thead>
@@ -175,12 +197,11 @@
 
 </div>
 
-<InputFile id="fileInput" OnChange="OnFileSelected" style="display:none"
-           accept=".log,.txt,.csv" />
+<InputFile id="fileInput" OnChange="OnFileSelected" style="display:none" accept=".log,.txt,.csv" />
 
 @code {
 
-    // State
+    // ─── State ───────────────────────────────────────────────────────────
     private AppSettings   _settings         = new();
     private List<LogLine> _lines            = new();
     private List<LogLine> _visibleLines     = new();
@@ -192,15 +213,18 @@
     private string        _lineCountText    = string.Empty;
     private bool          _showRules        = false;
 
-    // Exclusion filter — niveaux à MASQUER (bouton éteint = exclu)
+    // Exclusion filter
     private HashSet<string> _excludedLevels = new(StringComparer.OrdinalIgnoreCase);
+
+    // Sort state
+    private string? _sortColumn    = null;   // null = ordre original
+    private bool    _sortAscending = true;
 
     // Menu state
     private bool _fileMenuOpen     = false;
     private bool _viewMenuOpen     = false;
     private bool _settingsMenuOpen = false;
 
-    // Separator options
     private record SepOption(string Label, string Value);
     private readonly List<SepOption> _separators = new()
     {
@@ -211,7 +235,6 @@
         new("None",        ""),
     };
 
-    // Tous les boutons de filtre (built-in + dynamiques)
     private record QfButton(string Keyword, string BgColor);
     private readonly List<QfButton> _builtInFilters = new()
     {
@@ -222,14 +245,70 @@
     };
     private List<QfButton> _allFilterButtons = new();
 
-    // Lifecycle
+    // ─── Lifecycle ───────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
         _settings = await SettingsService.LoadAsync();
         RebuildFilterButtons();
     }
 
-    // File handling
+    // ─── Sort ────────────────────────────────────────────────────────────
+
+    private void SetSort(string column)
+    {
+        if (_sortColumn == column)
+        {
+            // Même colonne : inverse le sens
+            _sortAscending = !_sortAscending;
+        }
+        else
+        {
+            // Nouvelle colonne : croissant par défaut
+            _sortColumn    = column;
+            _sortAscending = true;
+        }
+        ApplyFilter();
+    }
+
+    private void ResetSort()
+    {
+        _sortColumn = null;
+        ApplyFilter();
+    }
+
+    private string SortIcon(string column)
+    {
+        if (_sortColumn != column) return string.Empty;
+        return _sortAscending ? " ▲" : " ▼";
+    }
+
+    private string SortClass(string column)
+        => _sortColumn == column ? "sorted" : string.Empty;
+
+    private IEnumerable<LogLine> ApplySort(IEnumerable<LogLine> source)
+    {
+        if (_sortColumn == null) return source;
+
+        Func<LogLine, string> key = _sortColumn switch
+        {
+            "Timestamp"   => l => l.Timestamp,
+            "Machine"     => l => l.Machine,
+            "Application" => l => l.Application,
+            "Level"       => l => l.Level,
+            "Category"    => l => l.Category,
+            "EventType"   => l => l.EventType,
+            "EventCode"   => l => l.EventCode,
+            "Message"     => l => l.Message,
+            "RawText"     => l => l.RawText,
+            _             => l => l.RawText,
+        };
+
+        return _sortAscending
+            ? source.OrderBy(key, StringComparer.OrdinalIgnoreCase)
+            : source.OrderByDescending(key, StringComparer.OrdinalIgnoreCase);
+    }
+
+    // ─── File handling ───────────────────────────────────────────────────
     private async Task OpenFilePicker()
     {
         CloseAllMenus();
@@ -257,7 +336,8 @@
                 && _lines.Any(l => !string.IsNullOrEmpty(l.Timestamp));
 
             _statusText = $"Loaded: {file.Name}";
-            _excludedLevels.Clear(); // reset filtres au chargement
+            _excludedLevels.Clear();
+            _sortColumn = null;
             ApplyFilter();
             UpdateLineCount();
 
@@ -270,7 +350,7 @@
         }
     }
 
-    // Rules
+    // ─── Rules ───────────────────────────────────────────────────────────
     private void ShowRules() { CloseAllMenus(); _showRules = true; }
 
     private async Task OnRulesSaved(List<HighlightRule> newRules)
@@ -286,23 +366,21 @@
 
     private void RebuildFilterButtons()
     {
-        var builtInKeywords = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        var builtIn = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             { "ERROR", "WARN", "INFO", "DEBUG" };
 
         var extra = _settings.HighlightRules
-            .Where(r => !builtInKeywords.Contains(r.Keyword))
+            .Where(r => !builtIn.Contains(r.Keyword))
             .Select(r => new QfButton(r.Keyword, r.BackgroundColor));
 
         _allFilterButtons = _builtInFilters.Concat(extra).ToList();
     }
 
-    // Exclusion toggle — cliquer sur un bouton allumé l'éteint (exclut ce niveau)
+    // ─── Filter ──────────────────────────────────────────────────────────
     private void ToggleExclusion(string keyword)
     {
-        if (_excludedLevels.Contains(keyword))
-            _excludedLevels.Remove(keyword);
-        else
-            _excludedLevels.Add(keyword);
+        if (_excludedLevels.Contains(keyword)) _excludedLevels.Remove(keyword);
+        else _excludedLevels.Add(keyword);
         ApplyFilter();
     }
 
@@ -312,7 +390,6 @@
         ApplyFilter();
     }
 
-    // Filter
     private void OnFilterChanged(ChangeEventArgs e)
     {
         _textFilter = e.Value?.ToString() ?? string.Empty;
@@ -323,33 +400,25 @@
 
     private void ApplyFilter()
     {
-        _visibleLines = _lines.Where(MatchesFilter).ToList();
+        var filtered = _lines.Where(MatchesFilter);
+        _visibleLines = ApplySort(filtered).ToList();
         UpdateLineCount();
         StateHasChanged();
     }
 
     private bool MatchesFilter(LogLine line)
     {
-        // Exclusion par niveau : si le niveau de la ligne est dans _excludedLevels → on cache
         if (_excludedLevels.Any())
         {
             var level = string.IsNullOrEmpty(line.Level) ? line.RawText : line.Level;
-            foreach (var excluded in _excludedLevels)
-            {
-                if (level.Contains(excluded, StringComparison.OrdinalIgnoreCase))
-                    return false;
-            }
+            foreach (var ex in _excludedLevels)
+                if (level.Contains(ex, StringComparison.OrdinalIgnoreCase)) return false;
         }
-
-        // Filtre texte
         if (!string.IsNullOrWhiteSpace(_textFilter))
         {
-            var cmp = _caseSensitive
-                ? StringComparison.Ordinal
-                : StringComparison.OrdinalIgnoreCase;
+            var cmp = _caseSensitive ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
             if (!line.RawText.Contains(_textFilter, cmp)) return false;
         }
-
         return true;
     }
 
@@ -357,12 +426,16 @@
     {
         var total    = _lines.Count;
         var filtered = _visibleLines.Count;
+        var sortInfo = _sortColumn != null
+            ? $"  |  sorted by {_sortColumn} {(_sortAscending ? "A-Z" : "Z-A")}"
+            : string.Empty;
+
         _lineCountText = total == filtered
-            ? $"{total:N0} lines"
-            : $"{filtered:N0} / {total:N0} lines";
+            ? $"{total:N0} lines{sortInfo}"
+            : $"{filtered:N0} / {total:N0} lines{sortInfo}";
     }
 
-    // Settings
+    // ─── Settings ────────────────────────────────────────────────────────
     private async Task SetSeparator(string sep)
     {
         _settings.ColumnSeparator = sep;
@@ -377,9 +450,8 @@
     }
 
     private bool IsActiveSep(string val)
-        => val == ""
-            ? !_settings.UseSeparator
-            : (_settings.UseSeparator && _settings.ColumnSeparator == val);
+        => val == "" ? !_settings.UseSeparator
+                     : (_settings.UseSeparator && _settings.ColumnSeparator == val);
 
     private async Task ToggleAutoScroll()
     {
@@ -387,17 +459,15 @@
         await SettingsService.SaveAsync(_settings);
     }
 
-    // UI helpers
+    // ─── UI helpers ──────────────────────────────────────────────────────
     private void ClearView()
     {
-        _lines.Clear();
-        _visibleLines.Clear();
-        _excludedLevels.Clear();
-        _fileName      = string.Empty;
-        _statusText    = "Ready — Open a log file to begin";
+        _lines.Clear(); _visibleLines.Clear();
+        _excludedLevels.Clear(); _sortColumn = null;
+        _fileName = string.Empty;
+        _statusText = "Ready — Open a log file to begin";
         _lineCountText = string.Empty;
-        CloseAllMenus();
-        StateHasChanged();
+        CloseAllMenus(); StateHasChanged();
     }
 
     private async Task ScrollToEnd()
@@ -405,13 +475,10 @@
 
     private void ToggleFileMenu()
     { _fileMenuOpen = !_fileMenuOpen; _viewMenuOpen = false; _settingsMenuOpen = false; }
-
     private void ToggleViewMenu()
     { _viewMenuOpen = !_viewMenuOpen; _fileMenuOpen = false; _settingsMenuOpen = false; }
-
     private void ToggleSettingsMenu()
     { _settingsMenuOpen = !_settingsMenuOpen; _fileMenuOpen = false; _viewMenuOpen = false; }
-
     private void CloseAllMenus()
     { _fileMenuOpen = false; _viewMenuOpen = false; _settingsMenuOpen = false; }
 }
