@@ -74,10 +74,9 @@
         <div class="filter-box">
             <span class="filter-icon">🔍</span>
             <input class="filter-input"
-                   placeholder="Filter logs…"
-                   @bind="_textFilter"
-                   @bind:event="oninput"
-                   @oninput="OnFilterChanged"/>
+       placeholder="Filter logs…"
+       value="@_textFilter"
+       @oninput="OnFilterChanged"/>
             <label class="case-toggle" title="Case sensitive">
                 <input type="checkbox" @bind="_caseSensitive" @bind:after="OnFilterChanged"/> Aa
             </label>
