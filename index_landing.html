@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LogTail — Choisissez votre version</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #0f1117; color: #e0e0e0;
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 2rem;
+    }
+    .hero { text-align: center; margin-bottom: 3.5rem; }
+    .hero-icon { font-size: 4rem; margin-bottom: 1rem; display: block; }
+    .hero h1  { font-size: 2.6rem; font-weight: 700; color: #fff; }
+    .hero p   { margin-top: .75rem; font-size: 1.05rem; color: #9ca3af; max-width: 480px; margin-inline: auto; }
+
+    .cards { display: flex; gap: 1.5rem; flex-wrap: wrap; justify-content: center; max-width: 900px; width: 100%; }
+
+    .card {
+      background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 16px;
+      padding: 2rem 1.75rem; width: 260px;
+      display: flex; flex-direction: column; align-items: flex-start; gap: .75rem;
+      transition: border-color .2s, transform .2s, box-shadow .2s;
+      cursor: pointer; position: relative; text-decoration: none; color: inherit;
+    }
+    .card:hover { border-color: #4f6ef7; transform: translateY(-4px); box-shadow: 0 12px 32px rgba(79,110,247,.18); }
+    .card.recommended { border-color: #4f6ef7; }
+    .badge {
+      position: absolute; top: -11px; right: 16px;
+      background: #4f6ef7; color: #fff;
+      font-size: .7rem; font-weight: 700; padding: .2rem .6rem;
+      border-radius: 99px; letter-spacing: .05em; text-transform: uppercase;
+    }
+    .card-icon { font-size: 2rem; }
+    .card h2   { font-size: 1.15rem; font-weight: 700; color: #fff; }
+    .card p    { font-size: .88rem; color: #9ca3af; line-height: 1.55; flex: 1; }
+    .card-tags { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .25rem; }
+    .tag { background: #2a2d3a; border-radius: 99px; font-size: .72rem; padding: .2rem .6rem; color: #6b7280; }
+
+    .btn {
+      display: inline-flex; align-items: center; gap: .4rem;
+      margin-top: .5rem; padding: .6rem 1.2rem; border-radius: 8px;
+      font-size: .88rem; font-weight: 600; border: none; cursor: pointer;
+      transition: opacity .15s; text-decoration: none; width: 100%; justify-content: center;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-primary   { background: #4f6ef7; color: #fff; }
+    .btn-green     { background: #16a34a; color: #fff; }
+    .btn-secondary { background: #2a2d3a; color: #d1d5db; }
+
+    /* Modal */
+    .overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.7); z-index: 100;
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+    .overlay.open { display: flex; }
+    .modal {
+      background: #1a1d27; border: 1px solid #2a2d3a; border-radius: 16px;
+      padding: 2rem; max-width: 500px; width: 100%;
+    }
+    .modal h3 { font-size: 1.2rem; color: #fff; margin-bottom: .5rem; }
+    .modal p  { color: #9ca3af; font-size: .9rem; line-height: 1.6; margin-bottom: 1.2rem; }
+
+    .steps { list-style: none; counter-reset: step; margin-bottom: 1.5rem; }
+    .steps li {
+      counter-increment: step;
+      display: flex; align-items: flex-start; gap: .75rem;
+      padding: .6rem 0; border-bottom: 1px solid #2a2d3a;
+      font-size: .88rem; color: #d1d5db;
+    }
+    .steps li:last-child { border: none; }
+    .steps li::before {
+      content: counter(step);
+      background: #4f6ef7; color: #fff; font-size: .75rem; font-weight: 700;
+      min-width: 22px; height: 22px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px;
+    }
+
+    .download-box {
+      background: #0d2d1a; border: 1px solid #16a34a; border-radius: 10px;
+      padding: 1rem 1.25rem; margin-bottom: 1rem;
+      display: flex; align-items: center; gap: 1rem;
+    }
+    .download-box .dl-icon { font-size: 2rem; }
+    .download-box .dl-info { flex: 1; }
+    .download-box .dl-name { color: #fff; font-weight: 600; font-size: .95rem; }
+    .download-box .dl-meta { color: #6b7280; font-size: .8rem; margin-top: .2rem; }
+    .download-box a {
+      background: #16a34a; color: #fff; border: none; border-radius: 8px;
+      padding: .55rem 1.1rem; font-size: .88rem; font-weight: 600;
+      cursor: pointer; text-decoration: none; white-space: nowrap;
+    }
+    .download-box a:hover { background: #15803d; }
+
+    code {
+      background: #0f1117; border: 1px solid #2a2d3a; border-radius: 4px;
+      padding: .1rem .4rem; font-size: .82rem; color: #7dd3fc;
+    }
+
+    .modal-close {
+      background: none; border: 1px solid #2a2d3a; color: #9ca3af; border-radius: 8px;
+      padding: .5rem 1rem; cursor: pointer; font-size: .85rem; width: 100%; margin-top: .5rem;
+    }
+    .modal-close:hover { background: #2a2d3a; }
+
+    /* Tableau comparatif */
+    .compare { margin-top: 3.5rem; max-width: 720px; width: 100%; }
+    .compare h3 { text-align: center; color: #6b7280; font-size: .85rem; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 1rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    th { color: #6b7280; font-weight: 600; padding: .5rem .75rem; text-align: left; border-bottom: 1px solid #2a2d3a; }
+    td { padding: .5rem .75rem; border-bottom: 1px solid #1a1d27; color: #d1d5db; }
+    td.yes  { color: #4ade80; }
+    td.no   { color: #ef4444; }
+    td.soon { color: #f59e0b; }
+
+    footer { margin-top: 3rem; font-size: .8rem; color: #374151; text-align: center; }
+    footer a { color: #4f6ef7; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <span class="hero-icon">📋</span>
+  <h1>LogTail</h1>
+  <p>Visualisez, filtrez et analysez vos fichiers de logs. Choisissez la version qui vous convient.</p>
+</div>
+
+<div class="cards">
+
+  <!-- Web / Blazor -->
+  <a class="card recommended" href="https://hachimohammed.github.io/LogTailBlazor/" target="_blank">
+    <span class="badge">⚡ Recommandé</span>
+    <span class="card-icon">🌐</span>
+    <h2>Version Web</h2>
+    <p>Aucune installation. Ouvrez votre navigateur et commencez immédiatement.</p>
+    <div class="card-tags">
+      <span class="tag">Blazor WASM</span>
+      <span class="tag">En ligne</span>
+      <span class="tag">Windows · Mac · Linux</span>
+    </div>
+    <span class="btn btn-primary">Ouvrir dans le navigateur →</span>
+  </a>
+
+  <!-- Windows EXE -->
+  <div class="card" onclick="showInstallModal()">
+    <span class="card-icon">🖥️</span>
+    <h2>Version Windows</h2>
+    <p>Application native. Fonctionne <strong style="color:#fff">sans internet</strong>. Surveillance des fichiers en <strong style="color:#fff">temps réel</strong>.</p>
+    <div class="card-tags">
+      <span class="tag">WPF</span>
+      <span class="tag">Hors ligne</span>
+      <span class="tag">Windows 10/11</span>
+      <span class="tag">.exe autonome</span>
+    </div>
+    <span class="btn btn-green">⬇ Télécharger .exe</span>
+  </div>
+
+  <!-- MAUI -->
+  <div class="card" onclick="showMauiModal()">
+    <span class="card-icon">📱</span>
+    <h2>Multi-plateforme</h2>
+    <p>Une seule app pour Windows, macOS, Android et iOS. En cours de développement.</p>
+    <div class="card-tags">
+      <span class="tag">.NET MAUI</span>
+      <span class="tag">Windows · Mac · Mobile</span>
+    </div>
+    <span class="btn btn-secondary">Bientôt disponible…</span>
+  </div>
+
+</div>
+
+<!-- Tableau comparatif -->
+<div class="compare">
+  <h3>Comparaison des versions</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Fonctionnalité</th>
+        <th>Web (Blazor)</th>
+        <th>Windows (WPF)</th>
+        <th>Multi-plateforme (MAUI)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Sans installation</td>      <td class="yes">✔</td>        <td class="no">✘</td>        <td class="no">✘</td></tr>
+      <tr><td>Fonctionne hors ligne</td>  <td class="no">✘</td>         <td class="yes">✔</td>       <td class="yes">✔</td></tr>
+      <tr><td>Temps réel (auto-reload)</td><td class="no">✘</td>        <td class="yes">✔</td>       <td class="soon">Prévu</td></tr>
+      <tr><td>Drag &amp; Drop fichier</td><td class="yes">✔</td>        <td class="yes">✔</td>       <td class="soon">Prévu</td></tr>
+      <tr><td>Windows · Mac · Linux</td>  <td class="yes">✔</td>        <td class="no">Windows only</td><td class="yes">✔</td></tr>
+      <tr><td>Mobile (Android / iOS)</td> <td class="no">✘</td>         <td class="no">✘</td>        <td class="soon">Prévu</td></tr>
+      <tr><td>Règles de coloration</td>   <td class="yes">✔</td>        <td class="yes">✔</td>       <td class="soon">Prévu</td></tr>
+      <tr><td>Multilingue FR/EN</td>      <td class="soon">Prévu</td>   <td class="soon">Prévu</td>  <td class="soon">Prévu</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<footer>
+  Projet open source · <a href="https://github.com/hachimohammed/LogTailBlazor" target="_blank">Voir sur GitHub</a>
+</footer>
+
+<!-- ── MODAL WINDOWS ──────────────────────────────────────────── -->
+<div class="overlay" id="installModal" onclick="closeModal(event,'installModal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>🖥️ Installer la version Windows</h3>
+    <p>Un seul fichier <code>.exe</code> autonome — aucune installation de .NET requise sur votre PC.</p>
+
+    <!-- Bouton de téléchargement direct -->
+    <div class="download-box">
+      <span class="dl-icon">📦</span>
+      <div class="dl-info">
+        <div class="dl-name">LogTail-win-x64.exe</div>
+        <div class="dl-meta">Windows 10 / 11 · 64 bits · ~80 MB</div>
+      </div>
+      <!-- ⚠️ Remplace le href par le lien réel de ta GitHub Release -->
+      <a href="https://github.com/hachimohammed/LogTailBlazor/releases/latest/download/LogTail-win-x64.exe"
+         download>
+        ⬇ Télécharger
+      </a>
+    </div>
+
+    <ol class="steps">
+      <li>Cliquez sur <strong>Télécharger</strong> ci-dessus</li>
+      <li>Si Windows affiche un avertissement SmartScreen → cliquez <em>Informations complémentaires</em> puis <em>Exécuter quand même</em></li>
+      <li>L'application s'ouvre directement — aucune installation</li>
+      <li>Cliquez <strong>Ouvrir</strong> ou glissez votre fichier <code>.log</code> dans la fenêtre</li>
+    </ol>
+
+    <p style="color:#6b7280; font-size:.8rem;">
+      Le fichier est publié automatiquement depuis le code source via GitHub Actions.
+      <a href="https://github.com/hachimohammed/LogTailBlazor/releases" target="_blank"
+         style="color:#4f6ef7;">Voir toutes les versions →</a>
+    </p>
+
+    <button class="modal-close" onclick="document.getElementById('installModal').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
+<!-- ── MODAL MAUI ─────────────────────────────────────────────── -->
+<div class="overlay" id="mauiModal" onclick="closeModal(event,'mauiModal')">
+  <div class="modal" onclick="event.stopPropagation()">
+    <h3>📱 Version Multi-plateforme (MAUI)</h3>
+    <p><strong>.NET MAUI</strong> permet d'avoir une seule base de code qui tourne sur Windows, macOS, Android et iOS.</p>
+    <ol class="steps">
+      <li><strong>Windows</strong> — application de bureau native</li>
+      <li><strong>macOS</strong> — application Mac native</li>
+      <li><strong>Android</strong> — application mobile (.apk)</li>
+      <li><strong>iOS / iPadOS</strong> — application Apple</li>
+    </ol>
+    <p>Cette version est en cours de développement et partagera le même code métier que les versions Web et Windows.</p>
+    <button class="modal-close" onclick="document.getElementById('mauiModal').classList.remove('open')">Fermer</button>
+  </div>
+</div>
+
+<script>
+  function showInstallModal() { document.getElementById('installModal').classList.add('open'); }
+  function showMauiModal()    { document.getElementById('mauiModal').classList.add('open'); }
+  function closeModal(e, id)  {
+    if (e.target.classList.contains('overlay'))
+      document.getElementById(id).classList.remove('open');
+  }
+</script>
+</body>
+</html>
